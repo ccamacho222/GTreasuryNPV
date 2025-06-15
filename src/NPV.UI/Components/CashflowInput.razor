@@ -1,0 +1,115 @@
+﻿<label for="cashflow-input">
+    <span class="fw-bold">Cashflow:</span>
+    <span class="ms-1"
+          data-bs-toggle="tooltip"
+          data-bs-placement="right"
+          title="A list of cash inflows and outflows over a time period.">
+        <i class="bi bi-info-circle"></i>
+    </span>
+</label>
+<p>
+    Enter your projected cash flows in the box below. 
+    Each number should occupy a new line, with the first line representing Year 0, the second Year 1, etc.
+    You can enter both positive (inflows) and negative (outflows) values.
+</p>
+
+<EditForm EditContext="_editContext">
+    <div>
+        
+        <InputTextArea id="cashflow-input" @bind-Value="_textAreaValue" class="@GetTextAreaClass()" rows="10" />
+        <ValidationMessage For="@(() => _textAreaValue)" class="text-danger d-block" /> @* Added Bootstrap classes here *@
+    </div>
+</EditForm>
+
+@code {
+    private string _textAreaValue = "";
+
+    //for validation
+    private EditContext _editContext;
+    private ValidationMessageStore _messageStore;
+
+    private List<decimal> _cashFlows = new List<decimal>();
+    public IReadOnlyList<decimal> CashFlows => _cashFlows.AsReadOnly();
+
+    //expose the parsed List<decimal> of cashflow values
+    [Parameter]
+    public EventCallback<List<decimal>> CashFlowsChanged { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(this); // Pass 'this' as the model for validation
+        _messageStore = new ValidationMessageStore(_editContext);
+
+        // Subscribe to validation events when the value changes
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private void HandleFieldChanged(object sender, FieldChangedEventArgs e)
+    {
+        // Only validate if the changed field is our text area
+        if (e.FieldIdentifier.FieldName == nameof(_textAreaValue))
+        {
+            ValidateTextArea();
+        }
+    }
+
+    private async Task ValidateTextArea()
+    {
+        _messageStore.Clear();
+        _cashFlows.Clear();
+
+        bool isValid = true;
+        string[] lines = _textAreaValue.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].Trim();
+
+            // check for blank lines
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                _messageStore.Add(new FieldIdentifier(this, nameof(_textAreaValue)), $"Line {i + 1}: Blank lines are not allowed.");
+                isValid = false;
+                continue;
+            }
+
+            // check for invalid input
+            if (!double.TryParse(line, out double value))
+            {
+                _messageStore.Add(new FieldIdentifier(this, nameof(_textAreaValue)), $"Line {i + 1}: '{line}' is not a valid number.");
+                isValid = false;
+                continue;
+            }
+
+            _cashFlows.Add(Convert.ToDecimal(value));
+        }
+
+        _editContext.NotifyValidationStateChanged();
+
+        if (isValid)
+        {
+            await CashFlowsChanged.InvokeAsync(_cashFlows.Select(x => x).ToList());
+        }
+        else
+        {
+            await CashFlowsChanged.InvokeAsync(new List<decimal>());
+        }
+    } //end ValidateTextArea()
+
+    public void Dispose()
+    {
+        if (_editContext != null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+
+    private string GetTextAreaClass()
+    {
+        if (_editContext != null && _editContext.GetValidationMessages(new FieldIdentifier(this, nameof(_textAreaValue))).Any())
+        {
+            return "form-control is-invalid";
+        }
+        return "form-control";
+    }
+}

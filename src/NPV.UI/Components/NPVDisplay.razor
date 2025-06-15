@@ -1,0 +1,38 @@
+﻿<label for="cashflow-input">
+    <span class="fw-bold">Net Present Value:</span>
+    <span class="ms-1"
+          data-bs-toggle="tooltip"
+          data-bs-placement="right"
+          title="The difference between the present value of cash inflows and the present value of cash outflows over a period of time.">
+        <i class="bi bi-info-circle"></i>
+    </span>
+</label>
+
+@if(!string.IsNullOrWhiteSpace(NPVErrorMessage))
+{
+    <div class="alert alert-info">System Error</div>
+}
+else
+{
+    @if (NPV.HasValue)
+    {
+        <div class="alert alert-primary">
+            <span class="fw-bold">AU$ @NPV.Value.ToString("#.00")</span>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-secondary">
+            <p>Not yet available</p>
+        </div>
+    }
+
+}
+
+@code {
+    [Parameter]
+    public decimal? NPV { get; set; }
+
+    [Parameter]
+    public string NPVErrorMessage { get; set; }
+}

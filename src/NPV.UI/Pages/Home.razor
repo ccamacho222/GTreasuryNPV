@@ -1,0 +1,108 @@
+﻿@page "/"
+@using NPV.UI.Components
+@using NPV.UI.Models
+@using NPV.UI.Services
+@inject IApiService _apiService
+@inject IJSRuntime _js
+
+
+<PageTitle>GTreasury NPV Calculator</PageTitle>
+
+<h3>NPV Calculator</h3> by applicant Chris Camacho
+
+<div class="container-fluid mt-5">
+    <div class="row g-3">
+        <div class="col-md-4 col-1-3 px-5">
+            <div class="mb-5">
+                <DiscountRatesDropdown DiscountRates="_pageState.DiscountRates"
+                                       SelectedRateChanged="HandleRateChanged" />
+            </div>
+            <div>
+                <CashflowInput CashFlowsChanged="HandleCashFlowsChanged" />
+            </div>
+        </div>
+
+        <div class="col-md-8 col-2-3">
+            <div class="mb-5">
+                <NPVDisplay NPV="@_pageState.NetPresentValue" NPVErrorMessage="@_pageState.NPVErrorMessage" />
+            </div>
+            <div>
+                @if (_pageState.Cashflow != null && _pageState.Cashflow.Any())
+                {
+                    <ChartDisplay Data="_pageState.Cashflow" />
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private PageState _pageState = new();
+    private IJSObjectReference _tooltipModule;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _tooltipModule = await _js.InvokeAsync<IJSObjectReference>("import", "./js/tooltips.js");
+            if (_tooltipModule != null)
+            {
+                await _tooltipModule.InvokeVoidAsync("initializeTooltips");
+            }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Home.OnInitializedAsync");
+        _pageState.DiscountRates = await _apiService.GetAvailableDiscountRates();
+        Console.WriteLine($"discountRates = {_pageState.DiscountRates.Count()}");
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task HandleRateChanged(decimal newRate)
+    {
+        _pageState.CurrentDiscountRate = newRate;
+        Console.WriteLine($"Received new {newRate} discount rate");
+        await RefreshNPV(_pageState.CurrentDiscountRate, _pageState.Cashflow);
+    }
+
+    private async Task HandleCashFlowsChanged(List<decimal> validatedCashFlows)
+    {
+        _pageState.Cashflow = validatedCashFlows;
+
+        Console.WriteLine($"Received {_pageState.Cashflow.Count} validated cash flow values.  Discount rate: {_pageState.CurrentDiscountRate}");
+        await RefreshNPV(_pageState.CurrentDiscountRate, _pageState.Cashflow);
+    }
+
+    private async Task RefreshNPV(decimal discountRate, List<decimal> cashFlows)
+    {
+        Console.WriteLine($"RefreshNPV triggered.  Discount rate = {discountRate}; cashflow count = {cashFlows.Count}");
+
+        try
+        {
+            //refresh NPV Display
+            _pageState.NPVErrorMessage = string.Empty;
+            _pageState.NetPresentValue = await _apiService.CalculateNetPresentValue(discountRate, cashFlows);
+            Console.WriteLine($"NPV = {_pageState.NetPresentValue}");
+        }
+        catch (Exception ex)
+        {
+            _pageState.NPVErrorMessage = ex.Message;
+            _pageState.NetPresentValue = 0;
+            Console.WriteLine($"Calculate NPV Error = {ex.Message}");
+        }
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_tooltipModule != null)
+        {
+            await _tooltipModule.InvokeVoidAsync("disposeTooltips");
+            await _tooltipModule.DisposeAsync();
+        }
+    }
+}

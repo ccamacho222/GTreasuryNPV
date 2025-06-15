@@ -1,0 +1,153 @@
+﻿@inject IJSRuntime Js
+
+<span class="fw-bold">Cashflow Chart:</span>
+
+<div id="npvChart" style="width: 100%; min-height: 350px;"></div>
+
+@code {
+    [Parameter]
+    public List<decimal> Data { get; set; }
+    
+    //hold the previous data to detect changes
+    private List<decimal> _previousData;
+    
+    private IJSObjectReference _chartModule;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Data != _previousData && (Data?.Count != _previousData?.Count ||
+                                      Data?.Sum() != _previousData?.Sum()))
+        {
+            _previousData = Data; // Update previous data
+            
+            if (Data != null && Data.Any())
+            {
+                await RenderOrUpdateChart();
+            }
+            else if (_chartModule != null)
+            {
+                // If data becomes null or empty, destroy the chart
+                await _chartModule.InvokeVoidAsync("destroyChart", "npvChart");
+                _chartModule = null; // Clear the reference
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called after the component has rendered.
+    /// Used here to initialize the JavaScript interop module on first render.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Import the JavaScript module for chart operations
+            _chartModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/chart.js");
+
+            // If data is already available on first render, create the chart
+            if (Data != null && Data.Any())
+            {
+                await RenderOrUpdateChart();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Renders or updates the ApexChart based on the current data.
+    /// </summary>
+    private async Task RenderOrUpdateChart()
+    {
+        if (_chartModule == null)
+        {
+            Console.WriteLine("Chart module not loaded yet.");
+            return;
+        }
+
+        // Prepare chart series data
+        var seriesData = Data.Select(d => (double)d).ToList(); // ApexCharts typically uses numbers, not decimals directly
+        var series = new[]
+        {
+            new { name = "Cash Flow", data = seriesData }
+        };
+
+        // Prepare chart categories (labels)
+        var categories = Data.Select((d, i) => $"Year {i}").ToList();
+
+        // Base options for the chart (from ApexCharts demo)
+        var options = new
+        {
+            chart = new
+            {
+                type = "bar", // Using 'bar' type for column charts in ApexCharts
+                height = 350,
+                // Ensures chart redraws correctly on container resize
+                animations = new { enabled = true, easing = "easeinout", speed = 800, animateGradually = new { enabled = true, delay = 150 }, dynamicAnimation = new { enabled = true, speed = 350 } }
+            },
+            plotOptions = new
+            {
+                bar = new
+                {
+                    horizontal = false,
+                    columnWidth = "55%",
+                    endingShape = "rounded"
+                }
+            },
+            dataLabels = new
+            {
+                enabled = true,
+                formatter = "function (val) { return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }", // Format as currency
+                dropShadow = new { enabled = true }
+            },
+            stroke = new
+            {
+                show = true,
+                width = 2,
+                colors = new[] { "transparent" }
+            },
+            xaxis = new
+            {
+                categories = categories,
+                title = new { text = "Year" }
+            },
+            yaxis = new
+            {
+                title = new { text = "Amount" },
+                labels = new
+                {
+                    formatter = "function (val) { return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }" // Format Y-axis labels as currency
+                }
+            },
+            fill = new
+            {
+                opacity = 1
+            },
+            tooltip = new
+            {
+                y = new
+                {
+                    formatter = "function (val) { return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }" // Format tooltip as currency
+                }
+            }
+        };
+
+        // If the chart hasn't been created yet, create it.
+        // Otherwise, update its series and categories.
+        if (Data.Count > 0)
+        {
+            await _chartModule.InvokeVoidAsync("createOrUpdateChart", "npvChart", series, categories, options);
+        }
+    }
+
+    /// <summary>
+    /// Disposes the JavaScript chart instance when the Blazor component is removed.
+    /// This prevents memory leaks.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_chartModule != null)
+        {
+            await _chartModule.InvokeVoidAsync("destroyChart", "npvChart");
+            await _chartModule.DisposeAsync();
+        }
+    }
+}

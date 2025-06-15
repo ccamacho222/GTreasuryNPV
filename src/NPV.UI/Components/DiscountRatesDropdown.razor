@@ -1,0 +1,51 @@
+﻿<label for="cashflow-input">
+    <span class="fw-bold">Discount Rate:</span>
+    <span class="ms-1"
+          data-bs-toggle="tooltip"
+          data-bs-placement="right"
+          title="The rate used to convert future cash flows to their equivalent present value.">
+        <i class="bi bi-info-circle"></i>
+    </span>
+</label>
+
+<InputSelect id="discount-rate" @bind-Value="SelectedRate" class="form-control">
+    <option value="">Select a discount rate</option>
+    @if (DiscountRates != null)
+    {
+        @foreach (var item in DiscountRates)
+        {
+            <option value="@item">@((item * 100).ToString("#.00")) %</option>
+        }
+    }
+</InputSelect>
+
+@code {
+    private decimal _selectedRate;
+
+    [Parameter]
+    public List<decimal> DiscountRates { get; set; }
+
+    [Parameter]
+    public decimal SelectedRate
+    {
+        get => _selectedRate;
+        set
+        {
+            if (_selectedRate != value)
+            {
+                _selectedRate = value;
+                Console.WriteLine("DiscountRatesDropdown.SelectedRate.set.SelectedRateChanged");
+                SelectedRateChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    [Parameter]
+    public EventCallback<decimal> SelectedRateChanged { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        
+        base.OnParametersSet();
+    }
+}

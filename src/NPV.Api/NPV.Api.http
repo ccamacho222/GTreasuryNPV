@@ -1,0 +1,50 @@
+@baseUrl = https://localhost:7209
+
+### Get Available Discount Rates
+GET {{baseUrl}}/NPV/discounts
+Accept: application/json
+
+### Calculate NPV; Zero Cashflow
+POST {{baseUrl}}/NPV
+Content-Type: application/json
+Accept: application/json
+{
+  "discountRate": 0.10,
+  "cashflow": []
+}
+
+### Calculate NPV; One Cashflow
+POST {{baseUrl}}/NPV
+Content-Type: application/json
+Accept: application/json
+{
+  "discountRate": 0.10,
+  "cashflow": [ -20000 ]
+}
+
+### Calculate NPV; Many Cashflow
+POST {{baseUrl}}/NPV
+Content-Type: application/json
+Accept: application/json
+{
+  "discountRate": 0.10,
+  "cashflow": [-100000.00, 30000.00, 40000.00, 50000.00, 30000.00]
+}
+
+### Calculate NPV; Many Zero Cashflows
+POST {{baseUrl}}/NPV
+Content-Type: application/json
+Accept: application/json
+{
+  "discountRate": 0.10,
+  "cashflow": [ 0, 0, 0, 0, 0, 0, 0, 0, 30000 ]
+}
+
+### Calculate NPV; Invalid Discount
+POST {{baseUrl}}/NPV
+Content-Type: application/json
+Accept: application/json
+{
+  "discountRate": -0.5,
+  "cashflow": [ 300, 700, -450, 650 ]
+}
